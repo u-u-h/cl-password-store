@@ -1,0 +1,71 @@
+(defpackage cl-password-store-tests
+  (:use #:cl #:cl-password-store #:fiveam)
+  (:shadow #:run))
+
+(in-package #:cl-password-store-tests)
+
+(defun random-username ()
+  (format nil "~A" (random 1000000000000000)))
+
+(defparameter *db-spec* '(("cl-password-store-testdb.sqlite3")
+			  :database-type :sqlite3 :if-exists :new))
+(def-suite tests)
+
+(in-suite tests)
+
+(test default-database-found-or-created
+      (is (not (null (open-password-database :spec *db-spec*)))))
+
+(defun kill-kwarg (list kw)
+  (loop :for (key val) :on list :by #'cddr
+     :unless (eq key kw)
+     :collect key :and :collect val))
+
+(test database-really-gone
+  (with-password-database ((open-password-database :spec *db-spec*))
+    (destructuring-bind (designator &rest kwargs)
+	 *db-spec*
+      (is-true (apply #'clsql:destroy-database designator
+		      (kill-kwarg kwargs :if-exists))))))
+
+(test default-store-created-and-opened
+  (with-password-database ((open-password-database :spec *db-spec*))
+    (let ((s1 (open-password-store))
+	  (s2 (open-password-store)))
+      (is (not (null s1)))
+      (is (not (null s2))))))
+
+(test unknown-user-does-not-exist
+  (with-password-database ((open-password-database :spec *db-spec*))
+    (with-password-store ((open-password-store))
+      (is (null (user-knownp (random-username)))))))
+
+(test authenticate-unknown-must-fail
+  (with-password-database ((open-password-database :spec *db-spec*))
+    (with-password-store ((open-password-store))
+      (signals user-unknown
+	(cl-password-store:authenticate-user (random-username) "foo")))))
+
+(test register-new-user-1
+  (with-password-database ((open-password-database :spec *db-spec*))
+    (with-password-store ((open-password-store))
+      (let ((user (random-username)))
+	(is (string= 
+	     user
+	     (register-user user :needs-confirmation-within nil
+			    :password "foo")))))))
+
+(test register-new-user-1-and-auth
+  (with-password-database ((open-password-database :spec *db-spec*))
+    (with-password-store ((open-password-store))
+      (let ((user (random-username)))
+	(register-user user :needs-confirmation-within nil
+		       :password "foo")
+	;; since we require no confirmation the account is active
+	(is-true (authenticate-user user "foo"))
+	(is-false (authenticate-user user "Foo"))))))
+
+(test have-2-users-now
+  (with-password-database ((open-password-database :spec *db-spec*))
+    (with-password-store ((open-password-store))
+      (is (= 2 (length (all-users)))))))

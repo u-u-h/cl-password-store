@@ -32,5 +32,8 @@
    ;; Conditions
    #:user-exists #:user-unknown
    #:password-token-expired #:confirmation-token-expired
+   ;; convenience macro
+   #:with-password-database
+   #:with-password-store   
    ))
 

@@ -399,3 +399,14 @@ Returns generalized boolean to indicate success.")
 	      (error (make-condition 'user-unknown :user-token user-token)))))))
 
 
+(defmacro with-password-database
+    ((&optional (database *default-password-database*))
+     &body body)
+  `(let* ((*default-password-database* ,database))
+     ,@body))
+
+(defmacro with-password-store
+    ((&optional (store *default-password-store*))
+     &body body)
+  `(let* ((*default-password-store* ,store))
+     ,@body))
