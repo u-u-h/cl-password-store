@@ -21,9 +21,9 @@ Users can be identified by strings or by subclassing
 `user-token-mixin`.
 
 For documentation check out the
-[API documentation](cl-password-store.html), or look at the
+[API documentation](http://u-u-h.github.io/cl-password-store/cl-password-store-package/index.html), or look at the
 [examples](examples.lisp). There is also a
-[5am](http://common-lisp.net/project/fiveam/) test suite.
+[5am](http://common-lisp.net/project/fiveam/) test suite in the file [tests.lisp](tests.lisp).
 
 The code has been written to be portable, and tested on
 [Allegro Common Lisp](http://www.franz.com/products/allegro-common-lisp/)
