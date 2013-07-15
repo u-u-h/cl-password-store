@@ -1,4 +1,27 @@
-;;;; cl-password-store.lisp
+;;; -*- Mode: Lisp; Syntax: ANSI-Common-Lisp; Base: 10; -*-
+;;;
+;;; cl-password-store.lisp --- Password management for Common Lisp (web) applications.
+
+;; Copyright (C) 2013 Utz-Uwe Haus <lisp@uuhaus.de>
+;;
+;; This code is free software; you can redistribute it and/or modify
+;; it under the terms of the version 2 of the GNU Library General
+;; Public License as published by the Free Software Foundation, as
+;; clarified by the prequel found in LICENSE.LLGPL
+;;
+
+;; This library is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;; Lesser General Public License for more details.
+
+;; You should have received a copy of the GNU Lesser General Public
+;; License along with this library; if not, write to the Free Software
+;; Foundation, Inc., 51 Franklin Street, Fifth Floor, 
+;; Boston, MA  02110-1301  USA
+;;
+;; Commentary:
+;; 
 
 (in-package #:cl-password-store)
 (clsql:file-enable-sql-reader-syntax)
@@ -20,9 +43,11 @@
   "Number of bits to use in a random token.")
 
 (defun generate-token ()
+  "Generate a random string suitable as a token."
   (format nil "~A" (random (expt 2 +token-bits+))))
 
 (defun token-equal (t1 t2)
+  "Equality predicate for tokens."
   ;; since hashes are hex-strings limited by CLSLQ 'string' fields:
   (string= t1 t2
 	   :end1 (min (length t1) clsql:*default-string-length*)
@@ -37,12 +62,13 @@
    (hash            :accessor get-hash
 		    :initarg :hash
 		    :documentation "The type of hash-digest to be used.")
-   (pepper :reader get-pepper :initarg :pepper
-	   :type string
-	   :documentation "Pepper value used in hashing.")
+   (pepper          :reader get-pepper :initarg :pepper
+	            :type string
+	            :documentation "Pepper value used in hashing.")
    (view-class-name :accessor get-view-class-name 
 		    :initarg :view-class-name
-		    :documentation "Name of the view class for password entries,a subclass of PASSWORD-ENTRY"))
+		    :documentation 
+		    "Name of the view class for password entries, a subclass of PASSWORD-ENTRY."))
   (:documentation "A password store.")
   (:default-initargs
       :view-class-name 'password-entry
@@ -58,34 +84,42 @@
 ;; slq table name. That way we can notice old versions floating
 ;; around in a database and offer to migrate the data.
 (clsql:def-view-class password-entry ()
-  ((user-token :db-kind :key
-	       :db-constraint :not-null
-	       :type string
-	       :initarg :user-token
-	       :reader get-user-token
-	       :documentation "A unique name for the user, as a string of up to clsql:*default-string-length* characters.")
-   (salt       :type string :initarg :salt
-	       :accessor get-salt
-	       :documentation "Salt value for this entry.")
-   (hashed-password :type string
-		    :initarg :password-hash
-		    :accessor get-hashed-password
-		    :documentation "The hashed password.")
-   (reset-token :type string :accessor get-reset-token
-		:documentation "If we are in a password reset phase, the token that needs to be presented to change the password.")
-   (token-expiry :type clsql:wall-time :accessor get-token-expiry
-		 :documentation "Date when reset-token expires.")
+  ((user-token          :db-kind :key
+			:db-constraint :not-null
+			:type string
+			:initarg :user-token
+			:reader get-user-token
+			:documentation
+			"A unique name for the user, as a string of up to
+ `clsql:*default-string-length*` characters.")
+   (salt               :type string :initarg :salt
+		       :accessor get-salt
+		       :documentation "Salt value for this entry.")
+   (hashed-password    :type string
+		       :initarg :password-hash
+		       :accessor get-hashed-password
+		       :documentation "The hashed password.")
+   (reset-token        :type string :accessor get-reset-token
+		       :documentation "If we are in a password reset phase, the token that needs to be presented to change the password, `NIL` otherwise.")
+   (token-expiry       :type clsql:wall-time :accessor get-token-expiry
+		       :documentation "Date when reset-token expires.")
    (confirmation-token :type string :accessor get-confirmation-token
 		       :initarg :confirmation-token
-		       :documentation "If we are in account creation phase, the token that needs to be presented to change activater the account.")
-   (confirmation-token-expiry :type clsql:wall-time :accessor get-confirmation-token-expiry
-			      :initarg :confirmation-token-expiry
-		 :documentation "Date when confirmation-token expires."))
+		       :documentation "If we are in account creation phase, the token that needs to be presented to activate the account, `NIL` otherwise.")
+   (confirmation-token-expiry
+                       :type clsql:wall-time
+		       :accessor get-confirmation-token-expiry
+		       :initarg :confirmation-token-expiry
+		       :documentation "Date when confirmation-token expires."))
+  (:documentation "View class used to represent a user/password entry and map it to SQL table data.")
   (:base-table PASSWORD_ENTRY_20130712))
 
-(defun password-entry-schema-migration-handler (database view-class-name)
-  (declare (ignore database view-class-name))
-  (values))
+(defgeneric password-entry-schema-migration-handler (database view-class-name)
+  (:documentation "A function to handle schema migration for password entry table.
+Takes two arguments, the `clsql:database` object and the current view class, e.g. [`password-entry`](class-password--entry.html).")
+  (:method (database view-class-name)
+    (declare (ignore database view-class-name))
+    (values)))
 
 (defun ensure-password-table (&key
 				(database *default-password-database*)
@@ -104,6 +138,7 @@
     (funcall schema-migration-handler database view-class-name)))
 
 (defun generate-salt (token)
+  "Generate a salt value for password hashing on TOKEN. Returns a string."
   (format nil "~A~D" token (random 1000000)))
 
 (defun find-user (user-token store)
@@ -112,6 +147,8 @@
       (error (make-condition 'user-unknown :user-token user-token))))
 
 (defgeneric add-user (store token password needs-confirmation-within)
+  (:documentation "Low level user creation function.
+Add user identified by TOKEN to STORE, with PASSWORD set, and possibly lock the account by requiring confirmation, depending on NEEDS-CONFIRMATION-WITHIN duration value.")
   (:method ((store password-store) token password needs-confirmation-within)
     (let* ((salt (generate-salt token))
 	   (record (make-instance
@@ -127,6 +164,7 @@
       (clsql:update-records-from-instance record :database (get-db store)))))
 
 (defun compute-expiration-date (validity)
+  "Compute the expiration date, which is at VALIDITY after current time."
   (clsql:time+ (clsql:get-time) validity))
 
 (defgeneric pending-confirmation (password-entry)
@@ -146,8 +184,7 @@ Returns a generalized Boolean.")
      (ironclad:digest-sequence 
       (get-hash store)
       (ironclad:ascii-string-to-byte-array
-       (concatenate 'string (get-pepper store) password salt)))))
-  )
+       (concatenate 'string (get-pepper store) password salt))))))
 
 (defun password-hash-equal (p1 p2)
   "Compare P1 and P2 for equality."
@@ -161,7 +198,9 @@ Returns a generalized Boolean.")
 ;;; user tokens can simply be strings, or you can use a class derived
 ;;; from user-token-mixin and rely on this code to call user-token-id
 (defclass user-token-mixin ()
-  ((id :type (string 255) :accessor get-id :initarg :id))
+  ((id :type (string clsql:*default-string-length*)
+       :accessor get-id :initarg :id
+       :documentation "A string identifying the user."))
   (:documentation "Mixin class for objects that can serve as user-token."))
 
 (defgeneric user-token-id (user-token)
@@ -402,11 +441,13 @@ Returns generalized boolean to indicate success.")
 (defmacro with-password-database
     ((&optional (database *default-password-database*))
      &body body)
+  "Evaluate BODY with DATABASE bound to a `clsql:database` (default: `*default-password-database*`)."
   `(let* ((*default-password-database* ,database))
      ,@body))
 
 (defmacro with-password-store
     ((&optional (store *default-password-store*))
      &body body)
+  "Evaluate BODY with STORE bound to a [`password-store`](class-password--store.html) (default: `*default-password-store*`)."
   `(let* ((*default-password-store* ,store))
      ,@body))
