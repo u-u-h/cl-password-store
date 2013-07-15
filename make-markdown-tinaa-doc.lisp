@@ -70,4 +70,4 @@ otherwise the identity."
 		      (lml2:lml-princ documentation)))))
       (call-next-method)))
 
-(tinaa:document-system 'package 'cl-password-store #p"doc/")
+(tinaa:document-system 'package 'cl-password-store #p"gh-pages/")
