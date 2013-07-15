@@ -1,0 +1,6 @@
+This branch contains the auto-generated documentation for
+cl-password-store, in order to have github.com magically present
+documentation.
+
+To update, clone the gh-pages branch as a subdirectory in the
+cl-password-store working copy and load make-markdown-tinaa-doc.lisp.
