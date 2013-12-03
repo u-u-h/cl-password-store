@@ -27,7 +27,8 @@
   (:use #:cl)
   ;; classes:
   (:export #:user-token-mixin
-	   #:password-store)
+	   #:password-store
+	   #:password-entry)
   ;; store creation and database
   (:export #:open-password-database
 	   #:open-password-store

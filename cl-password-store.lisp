@@ -127,8 +127,7 @@ Takes two arguments, the `clsql:database` object and the current view class, e.g
 				(schema-migration-handler
 				 #'password-entry-schema-migration-handler))
   "Ensure that DATABASE has a suitable password table named TABLENAME."
-  (unless (clsql:table-exists-p 
-	   (clsql:sql-view-class 'cl-password-store::password-entry)
+  (unless (clsql:table-exists-p view-class-name
 	   :database database)
     ;; table needs to be created
     (clsql:create-view-from-class view-class-name
@@ -213,7 +212,7 @@ Returns a generalized Boolean.")
 
 (defun open-password-database 
     (&key (spec '(("cl-password-store.sqlite3") :database-type :sqlite3 :if-exists :old)))
-  "Open password database specified by :SPEC, which must be and argument list suitable for clsql:connect.
+  "Open password database specified by :SPEC, which must be an argument list suitable for clsql:connect.
 Default is to use '((\"cl-password-store.sqlite3\") :sqlite3); if you use this default you will have to have clsql-sqlite3 loaded too.
 Returns an clsql:database object suitable as argument to OPEN-PASSWORD-STORE."
   (apply #'clsql:connect spec))
