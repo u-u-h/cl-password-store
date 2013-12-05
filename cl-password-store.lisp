@@ -127,7 +127,8 @@ Takes two arguments, the `clsql:database` object and the current view class, e.g
 				(schema-migration-handler
 				 #'password-entry-schema-migration-handler))
   "Ensure that DATABASE has a suitable password table named TABLENAME."
-  (unless (clsql:table-exists-p view-class-name
+  (unless (clsql:table-exists-p (clsql-sys:view-table 
+				 (find-class view-class-name))
 	   :database database)
     ;; table needs to be created
     (clsql:create-view-from-class view-class-name
@@ -160,7 +161,8 @@ Add user identified by TOKEN to STORE, with PASSWORD set, and possibly lock the 
 		    :confirmation-token-expiry 
 		    (and needs-confirmation-within
 			 (compute-expiration-date needs-confirmation-within)))))
-      (clsql:update-records-from-instance record :database (get-db store)))))
+      (clsql:update-records-from-instance record :database (get-db store))
+      token)))
 
 (defun compute-expiration-date (validity)
   "Compute the expiration date, which is at VALIDITY after current time."
