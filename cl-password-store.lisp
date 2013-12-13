@@ -185,7 +185,8 @@ Returns a generalized Boolean.")
      (ironclad:digest-sequence 
       (get-hash store)
       (ironclad:ascii-string-to-byte-array
-       (concatenate 'string (get-pepper store) password salt))))))
+       (concatenate 'string (get-pepper store)
+		    password salt))))))
 
 (defun password-hash-equal (p1 p2)
   "Compare P1 and P2 for equality."
@@ -320,6 +321,7 @@ Returns a generalized Boolean.")
 		T)
 	      NIL)))))
 
+
 (defgeneric user-knownp
     (user-token &key store)
   (:documentation
@@ -333,9 +335,11 @@ Returns a generalized boolean.")
      (clsql:select
       (get-view-class-name store)
       :flatp T
-      :database (get-db store)
-      :where [= user-token 
-                [slot-value (get-view-class-name store) 'user-token]]))))
+	:database (get-db store)
+	:where [= user-token 
+	[slot-value (get-view-class-name store) 'user-token]]))))
+
+
 
 (defgeneric authenticate-user
     (user-token password 
@@ -343,7 +347,8 @@ Returns a generalized boolean.")
   (:documentation
    "Check whether USER-TOKEN successfully authenticates with
 PASSWORD in STORE (default: *default-password-store*).
-Returns a generalized Boolean.")
+Returns a generalized Boolean.
+If user had a password-reset-token pending, clear it upon successfull auth.")
   (:method ((user-token user-token-mixin) (password string)
 	    &key (store *default-password-store*))
     (authenticate-user (user-token-id user-token)
@@ -353,9 +358,14 @@ Returns a generalized Boolean.")
     (let ((record (find-user user-token store)))
       (and record
 	   (not (pending-confirmation record))
-	   (password-hash-equal 
-	    (get-hashed-password record)
-	    (compute-password-hash store password (get-salt record))))))) 
+	   (let ((authenticated
+		  (password-hash-equal 
+		   (get-hashed-password record)
+		   (compute-password-hash store password (get-salt record)))))
+	     (when authenticated
+	       (clear-password-reset-token record :store store))
+	     authenticated)))))
+
 
 (defgeneric all-users (&key store)
   (:documentation "Return a list of all user-tokens present in STORE (default: *default-password-store*.")
@@ -387,6 +397,22 @@ Returns a string, the token.")
       (clsql:update-records-from-instance record :database (get-db store))
       (get-reset-token record))))
 
+(defgeneric clear-password-reset-token (user &key store)
+  (:documentation "Clear password reset token of USER-TOKEN")
+  (:method ((user-token string) &key (store *default-password-store*))
+    (clear-password-reset-token (find-user user-token store)))
+  (:method ((user-token user-token-mixin) &key (store *default-password-store*))
+    (clear-password-reset-token (find-user user-token store)))
+  (:method ((user-record user-token-mixin) &key (store *default-password-store*))
+    (setf (get-reset-token user-record) NIL
+	  (get-token-expiry user-record) NIL)
+    (clsql:update-record-from-slots user-record
+				    'reset-token 'token-expiry
+				    :database (get-db store))
+    user-record))
+
+
+
 (defgeneric reset-password
     (user-token reset-token new-password &key store)
   (:documentation
@@ -401,7 +427,7 @@ Returns generalized boolean to indicate success.")
   (:method ((user-token string)
 	    (reset-token string) (new-password string)
 	    &key (store *default-password-store*))
-    (let ((record (find-user  user-token store)))
+    (let ((record (find-user user-token store)))
       (if (not (clsql:time< (clsql:get-time) (get-token-expiry record)))
 	  (error (make-condition 'password-token-expired
 				 :user-token user-token
@@ -413,8 +439,7 @@ Returns generalized boolean to indicate success.")
 		      (generate-salt user-token))
 		(setf (get-hashed-password record)
 		      (compute-password-hash store new-password (get-salt record)))
-		(setf (get-reset-token record) NIL
-		      (get-token-expiry record) NIL)
+		(clear-password-reset-token record)
 		(clsql:update-records-from-instance
 		 record :database (get-db store)))
 	      NIL)))))
