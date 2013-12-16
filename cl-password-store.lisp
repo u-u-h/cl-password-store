@@ -252,7 +252,7 @@ Returns up to two values: a user object and possibly the confirmation token.")
 	    &key (store *default-password-store*)
 	      password
 	      (needs-confirmation-within *default-token-validity*))
-    (if (user-knownp user-token)
+    (if (user-knownp user-token :store store)
 	(error (make-condition 'user-exists :user-token user-token))
 	;; FIXME: registration confirmation tokens missing
 	(let ((record (add-user store user-token password
