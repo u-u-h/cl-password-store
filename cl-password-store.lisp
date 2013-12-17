@@ -235,7 +235,8 @@ Returns an clsql:database object suitable as argument to OPEN-PASSWORD-STORE."
     (user-token &key store password needs-confirmation-within)
   (:documentation
    "Register user identified by USER-TOKEN in store specified by :STORE argument (default: *default-password-store*). Set password if :PASSWORD is given (default: no password set, meaning locked account). :NEEDS-CONFIRMATION-within (default *default-token-validity*) makes the account unusable until confirmation has occured. Can be NIL to indicate that no confirmation is needed.
-Returns up to two values: a user object and possibly the confirmation token.")
+Returns up to two values: a user object and possibly the confirmation token.
+raises a user-exists condition if user already exists.")
   (:method ((user-token user-token-mixin)
 	    &key (store *default-password-store*)
 	      password
@@ -331,7 +332,7 @@ Returns a generalized Boolean.")
     (user-token &key store)
   (:documentation
    "Check whether user identified by USER-TOKEN is known in store specified by :STORE (default: *default-password-store*).
-Returns a generalized boolean.")
+Returns a password-entry instance or NIL.")
   (:method ((user-token user-token-mixin)
 	    &key (store *default-password-store*))
     (user-knownp (user-token-id user-token) :store store))
@@ -402,17 +403,16 @@ Returns a string, the token.")
 
 (defgeneric clear-password-reset-token (user &key store)
   (:documentation "Clear password reset token of USER-TOKEN")
-  (:method ((user-token string) &key (store *default-password-store*))
-    (clear-password-reset-token (find-user user-token store)))
-  (:method ((user-token user-token-mixin) &key (store *default-password-store*))
-    (clear-password-reset-token (find-user user-token store)))
-  (:method ((user-record user-token-mixin) &key (store *default-password-store*))
+  (:method ((user-record password-entry) &key (store *default-password-store*))
     (setf (get-reset-token user-record) NIL
 	  (get-token-expiry user-record) NIL)
-    (clsql:update-record-from-slots user-record
-				    'reset-token 'token-expiry
-				    :database (get-db store))
-    user-record))
+    (clsql:update-records-from-instance user-record :database (get-db store))
+    user-record)
+  (:method ((user-token string) &key (store *default-password-store*))
+    (clear-password-reset-token (find-user user-token store) :store store))
+  (:method ((user-token user-token-mixin) &key (store *default-password-store*))
+    (clear-password-reset-token (find-user (user-token-id user-token) store) :store store)))
+
 
 
 
