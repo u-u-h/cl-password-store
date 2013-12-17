@@ -44,6 +44,7 @@
    #:register-user
    #:get-user-confirmation-token
    #:confirm-registration
+   #:pending-confirmationp
    ;; query
    #:user-knownp
    #:authenticate-user

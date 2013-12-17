@@ -168,17 +168,12 @@ Add user identified by TOKEN to STORE, with PASSWORD set, and possibly lock the 
   "Compute the expiration date, which is at VALIDITY after current time."
   (clsql:time+ (clsql:get-time) validity))
 
-(defgeneric pending-confirmation (password-entry)
-  (:documentation "Check whether PASSWORD-ENTRY is blocked because it needs confirmation.
-Returns a generalized Boolean.")
-  (:method ((record password-entry))
-    (not (null (get-confirmation-token record)))))
-
 
 ;;; hashing
 (defgeneric compute-password-hash (store password salt)
   (:documentation "Compute the appropriate hash value for PASSWORD in STORE.")
   (:method ((store password-store) (password (eql nil)) salt)
+    (declare (ignore salt))
     NIL)
   (:method ((store password-store) (password string) (salt string))
     (ironclad:byte-array-to-hex-string
@@ -321,6 +316,16 @@ Returns a generalized Boolean.")
 		T)
 	      NIL)))))
 
+(defgeneric pending-confirmationp (password-entry &key store)
+  (:documentation "Check whether PASSWORD-ENTRY is blocked because it needs confirmation.
+Returns a generalized Boolean.")
+  (:method ((record password-entry) &key (store *default-password-store*))
+    (declare (ignore store))
+    (not (null (get-confirmation-token record))))
+  (:method ((user-token string) &key (store *default-password-store*))
+    (pending-confirmationp (find-user user-token store) :store store))
+  (:method ((user-token user-token-mixin) &key (store *default-password-store*))
+    (pending-confirmationp (find-user user-token store) :store store)))
 
 (defgeneric user-knownp
     (user-token &key store)
@@ -339,8 +344,6 @@ Returns a generalized boolean.")
 	:where [= user-token 
 	[slot-value (get-view-class-name store) 'user-token]]))))
 
-
-
 (defgeneric authenticate-user
     (user-token password 
      &key store)
@@ -357,7 +360,7 @@ If user had a password-reset-token pending, clear it upon successfull auth.")
 	    &key (store *default-password-store*))
     (let ((record (find-user user-token store)))
       (and record
-	   (not (pending-confirmation record))
+	   (not (pending-confirmationp record :store store))
 	   (let ((authenticated
 		  (password-hash-equal 
 		   (get-hashed-password record)
