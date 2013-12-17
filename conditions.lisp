@@ -59,6 +59,19 @@
   (:documentation
    "Condition raised if a password change was attempted with a token whose validity duration has expired."))
 
+(define-condition password-token-invalid (cl-password-store-condition)
+  ((user-token :accessor get-user-token :initarg :user-token
+	       :documentation "The user-token that triggered the condition.")
+   (reset-token :accessor get-reset-token     :initarg :reset-token
+	       :documentation "The token that is invalid."))
+  (:report
+   (lambda (condition stream)
+     (format stream "User ~A's password reset token is invalid: ~A."
+	     (get-user-token condition)
+	     (get-reset-token condition))))
+  (:documentation
+   "Condition raised if a password change was attempted with a bad token"))
+
 (define-condition confirmation-token-expired (cl-password-store-condition)
   ((user-token :accessor get-user-token :initarg :user-token
 	       :documentation "The user-token that triggered the condition.")

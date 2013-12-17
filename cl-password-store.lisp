@@ -414,8 +414,6 @@ Returns a string, the token.")
     (clear-password-reset-token (find-user (user-token-id user-token) store) :store store)))
 
 
-
-
 (defgeneric reset-password
     (user-token reset-token new-password &key store)
   (:documentation
@@ -431,21 +429,26 @@ Returns generalized boolean to indicate success.")
 	    (reset-token string) (new-password string)
 	    &key (store *default-password-store*))
     (let ((record (find-user user-token store)))
-      (if (not (clsql:time< (clsql:get-time) (get-token-expiry record)))
-	  (error (make-condition 'password-token-expired
-				 :user-token user-token
-				 :expiry (get-token-expiry record)))
-	  (if (token-equal (get-reset-token record) reset-token)
-	      (progn
-		;; actually change password
-		(setf (get-salt record) 
-		      (generate-salt user-token))
-		(setf (get-hashed-password record)
-		      (compute-password-hash store new-password (get-salt record)))
-		(clear-password-reset-token record)
-		(clsql:update-records-from-instance
-		 record :database (get-db store)))
-	      NIL)))))
+      (cond 
+	((not (get-token-expiry record))
+	 (error (make-condition 'password-token-invalid :user-token user-token
+				:reset-token reset-token)))
+	((not (clsql:time< (clsql:get-time) (get-token-expiry record)))
+	 (error (make-condition 'password-token-expired
+				:user-token user-token
+				:expiry (get-token-expiry record))))
+	((token-equal (get-reset-token record) reset-token)
+	 (clsql:with-transaction (:database (get-db store))
+	   ;; actually change password
+	   (setf (get-salt record) 
+		 (generate-salt user-token))
+	   (setf (get-hashed-password record)
+		 (compute-password-hash store new-password (get-salt record)))
+	   (clear-password-reset-token record :store store)
+	   (clsql:update-records-from-instance
+	    record :database (get-db store))))
+	(T
+	  NIL)))))
 
 (defgeneric delete-user
     (user-token &key store no-exist-ok)
