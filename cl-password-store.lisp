@@ -301,21 +301,23 @@ Returns a generalized Boolean.")
     (let ((record (or (user-knownp user-token :store store)
 		      (error (make-condition 'user-unknown
 					     :user-token user-token)))))
-      (if (not (clsql:time< (clsql:get-time)
-			    (get-confirmation-token-expiry record)))
-	  (error (make-condition
-		  'confirmation-token-expired
-		  :user-token user-token
-		  :expiry (get-confirmation-token-expiry record)))
-	  (if (token-equal (get-confirmation-token record) confirmation-token)
-	      (progn
-		(setf (get-confirmation-token record) nil
-		      (get-confirmation-token-expiry record) nil)
-		(clsql:update-records-from-instance 
-		 record
-		 :database (get-db store))
-		T)
-	      NIL)))))
+      (cond
+	((not (get-confirmation-token record))
+	 (error (make-condition 'confirmation-token-invalid :user-token user-token
+				:confirmation-token confirmation-token)))
+	((not (clsql:time< (clsql:get-time)
+			   (get-confirmation-token-expiry record)))
+	 (error (make-condition
+		 'confirmation-token-expired
+		 :user-token user-token
+		 :expiry (get-confirmation-token-expiry record))))
+	((token-equal (get-confirmation-token record) confirmation-token)
+	 (setf (get-confirmation-token record) nil
+	       (get-confirmation-token-expiry record) nil)
+	 (clsql:update-records-from-instance record :database (get-db store))
+	 T)
+	(T
+	 NIL)))))
 
 (defgeneric pending-confirmationp (password-entry &key store)
   (:documentation "Check whether PASSWORD-ENTRY is blocked because it needs confirmation.

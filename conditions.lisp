@@ -85,7 +85,18 @@
   (:documentation 
    "Condition raised if a user confirmation was attempted with a token whose validity duration has expired."))
 
-
+(define-condition confirmation-token-invalid (cl-password-store-condition)
+  ((user-token :accessor get-user-token :initarg :user-token
+	       :documentation "The user-token that triggered the condition.")
+   (confirmation-token :accessor get-confirmation-token     :initarg :confirmation-token
+		       :documentation "The token that is invalid."))
+  (:report
+   (lambda (condition stream)
+     (format stream "User ~A's confirmation token is invalid: ~A."
+	     (get-user-token condition)
+	     (get-confirmation-token condition))))
+  (:documentation
+   "Condition raised if a user confirmation was attempted with a bad token"))
 
 
 

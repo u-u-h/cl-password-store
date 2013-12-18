@@ -57,7 +57,7 @@
    ;; Conditions
    #:user-exists #:user-unknown
    #:password-token-expired #:confirmation-token-expired
-   #:password-token-invalid
+   #:password-token-invalid #:confirmation-token-invalid
    ;; convenience macro
    #:with-password-database
    #:with-password-store)
