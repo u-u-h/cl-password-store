@@ -195,7 +195,7 @@ Add user identified by TOKEN to STORE, with PASSWORD set, and possibly lock the 
 ;;; user tokens can simply be strings, or you can use a class derived
 ;;; from user-token-mixin and rely on this code to call user-token-id
 (defclass user-token-mixin ()
-  ((id :type (string clsql:*default-string-length*)
+  ((id :type (string #.clsql:*default-string-length*)
        :accessor get-id :initarg :id
        :documentation "A string identifying the user."))
   (:documentation "Mixin class for objects that can serve as user-token."))
